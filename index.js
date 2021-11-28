@@ -1,86 +1,65 @@
-class EventWatcher {
+import React from "react";
+import {DeviceEventEmitter} from "react-native";
 
-    static _WatchListener = {
+class EventWatcher {
+    static _Listeners = {
         count: 0,
         refs: {}
     }
-
-    static _Listeners = {
-        count: 0,
-        refs: {},
+    static _Watcher = { }
+    static onEventListener(eventName, callback){
+        EventWatcher._Watcher[eventName] = DeviceEventEmitter.addListener(eventName, callback);
     }
-
-    static onEventListener(eventName, callback) {
-        if (
-            typeof eventName=== 'string' &&
-            typeof callback === 'function'
-        ) {
-            EventWatcher._WatchListener.count++
-            const eventId = 'W' + EventWatcher._WatchListener.count
-            EventWatcher._WatchListener.refs[eventId] = {
-                name: eventName,
-                callback
-            }
-            return eventId;
+    static addEventListener(eventName, callback){
+        const eventId = `E-${EventWatcher._Listeners.count}${eventName}`
+        const remove = DeviceEventEmitter.addListener(eventId,callback)
+        EventWatcher._Listeners.count++
+        EventWatcher._Listeners.refs[eventId] = {
+            eventName,
+            callback,
+            remove
         }
-        return false
+        DeviceEventEmitter.emit(eventName,true);
     }
-
-    static addEventListener(eventName, callback) {
-        if (
-            typeof eventName=== 'string' &&
-            typeof callback === 'function'
-        ) {
-            EventWatcher._Listeners.count++
-            const eventId = 'l' + EventWatcher._Listeners.count
-            EventWatcher._Listeners.refs[eventId] = {
-                name: eventName,
-                callback,
+    static emitEvent(eventName, data){
+        for (const listenersKey in EventWatcher._Listeners){
+            const {eventName: lookupEvent} = EventWatcher._Listeners[listenersKey];
+            if(lookupEvent === eventName){
+                DeviceEventEmitter.emit(listenersKey,data);
             }
-            Object.keys(EventWatcher._WatchListener.refs).forEach(_id => {
-                if (
-                    EventWatcher._WatchListener.refs[_id] &&
-                    eventName === EventWatcher._WatchListener.refs[_id].name
-                ) {
-                    EventWatcher._WatchListener.refs[_id].callback(true)
+        }
+    }
+    static removeEventListener(eventName){
+        for (const listenersKey in EventWatcher._Listeners) {
+            if(listenersKey in EventWatcher._Listeners){
+                const {eventName: lookupEvent, remove} = EventWatcher._Listeners[listenersKey];
+                if(lookupEvent === eventName){
+                    remove && remove();
+                    if(eventName in EventWatcher._Watcher){
+                        EventWatcher._Watcher[eventName] && EventWatcher._Watcher[eventName]();
+                        delete EventWatcher._Watcher[eventName];
+                    }
+                    delete EventWatcher._Listeners[listenersKey];
                 }
-            })
-            return eventId
-        }
-        return false
-    }
-    static removeEventListener(id) {
-        if (typeof id === 'string') {
-            if(id in EventWatcher._WatchListener.refs){
-                EventWatcher._WatchListener.refs[id].callback(false)
             }
-            return delete EventWatcher._Listeners.refs[id]
         }
-        return false
+        const null_safe = {};
+        const copy = EventWatcher._Listeners;
+        for (const copyKey in copy) {
+            if(copy[copyKey]){
+                null_safe[copyKey] = copy[copyKey];
+            }
+        }
+        EventWatcher._Listeners = null_safe;
     }
-
-    static removeAllListeners() {
-        let removeError = false
-        Object.keys(EventWatcher._Listeners.refs).forEach(_id => {
-            const removed = delete EventWatcher._Listeners.refs[_id]
-            removeError = (!removeError) ? !removed : removeError
-        })
-        Object.keys(EventWatcher._WatchListener.refs).forEach(_id => {
-            delete EventWatcher._WatchListener.refs[_id]
-        })
-        return !removeError
+    static removeAllListeners(){
+        for (const listenersKey in EventWatcher._Listeners){
+            if(listenersKey in EventWatcher._Listeners){
+                const {eventName: lookupEvent} = EventWatcher._Listeners[listenersKey];
+                EventWatcher.removeEventListener(lookupEvent);
+            }
+        }
     }
-
-    static emitEvent(eventName, data) {
-        Object.keys(EventWatcher._Listeners.refs).forEach(_id => {
-            if (
-                EventWatcher._Listeners.refs[_id] &&
-                eventName === EventWatcher._Listeners.refs[_id].name
-            )
-                EventWatcher._Listeners.refs[_id].callback(data)
-        })
-    }
-
     /*
      * shortener
      */
